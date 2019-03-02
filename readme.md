@@ -1,6 +1,6 @@
 # spherical-image
 
-Very light weight 360deg spherical image viewer
+Very lightweight 360deg spherical image viewer
 
 [![Latest NPM release](https://img.shields.io/npm/v/spherical-image.svg)](https://www.npmjs.com/package/spherical-image)
 ![MIT License](https://img.shields.io/npm/l/spherical-image.svg)
@@ -16,7 +16,7 @@ $ npm install --save spherical-image
 ```
 
 then
-```javascript
+```html
 <canvas id="myCanvas" width="800" height="600"></canvas>
 ```
 
