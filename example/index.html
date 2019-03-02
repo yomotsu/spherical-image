@@ -1,0 +1,24 @@
+<html>
+<head>
+<title>Equirectangular形式(正距円筒図法)</title>
+</head>
+
+
+<body>
+
+Drag to rotate<br>
+<canvas id="canvas0" width="800" height="600"></canvas>
+
+
+<script src="../dist/spherical-image.js"></script>
+<script>
+
+const renderer0 = new SphericalImage.Renderer(
+  document.getElementById( 'canvas0' ),
+  './img.jpg'
+);
+
+</script>
+</body>
+
+</html>

@@ -1,0 +1,28 @@
+{
+  "name": "spherical-image",
+  "version": "0.0.0",
+  "author": "Yomotsu",
+  "license": "MIT",
+  "repository": "yomotsu/spherical-image",
+  "jsnext:main": "dist/spherical-image.module.js",
+  "module": "dist/spherical-image.module.js",
+  "main": "dist/spherical-image.js",
+  "types": "dist/index.d.ts",
+  "devDependencies": {
+    "rollup": "^1.4.0",
+    "rollup-plugin-typescript2": "^0.19.3",
+    "rollup-watch": "^4.3.1",
+    "terser": "^3.16.1",
+    "typescript": "^3.3.3333"
+  },
+  "scripts": {
+    "dev": "rollup --config --watch",
+    "build": "rollup --config && terser 'dist/spherical-image.js' -o 'dist/spherical-image.min.js' --comments '/^!/'"
+  },
+  "keywords": [
+    "webgl",
+    "360",
+    "spherical",
+    "panorama"
+  ]
+}
