@@ -1,4 +1,9 @@
-export declare class Renderer {
+import { TextureSource } from './SphereMesh';
+interface Options {
+    initialRotationPhi: number;
+    initialRotationTheta: number;
+}
+export declare class SphericalImage {
     private _canvas;
     private _width;
     private _height;
@@ -9,9 +14,10 @@ export declare class Renderer {
     private _viewMatrix;
     private _cameraRotation;
     private _webGLProperties;
-    private _sphiricalObject0;
-    constructor(canvas: HTMLCanvasElement, textureSource: string | HTMLCanvasElement);
+    private _sphereMesh0;
+    constructor(canvas: HTMLCanvasElement, textureSource: TextureSource, options?: Options);
     setSize(width: number, height: number): void;
     private _render;
     private _renderObject;
 }
+export {};

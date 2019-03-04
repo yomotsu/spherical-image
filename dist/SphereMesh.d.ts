@@ -1,8 +1,11 @@
 import { EventDispatcher } from './EventDispatcher';
-export declare type BaseTexture = HTMLImageElement | HTMLCanvasElement;
-export declare class SphiricalObject extends EventDispatcher {
+import { Matrix4 } from 'Matrix4';
+export declare type TextureSource = string | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
+export declare type BaseTexture = HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
+export declare class SphereMesh extends EventDispatcher {
     private _baseTexture;
-    constructor(textureSource: string | HTMLCanvasElement);
+    private _modelMatrix;
+    constructor(textureSource: TextureSource, initialRotationPhi: number, initialRotationTheta: number);
     readonly attributes: {
         index: {
             array: Uint16Array;
@@ -25,6 +28,8 @@ export declare class SphiricalObject extends EventDispatcher {
             numItems: number;
         };
     };
+    readonly modelMatrix: Matrix4;
     readonly baseTexture: BaseTexture;
-    updateTexture(textureSource: string | HTMLCanvasElement): void;
+    rotate(phi: number, theta: number): void;
+    updateTexture(textureSource: TextureSource): void;
 }

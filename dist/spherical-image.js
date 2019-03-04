@@ -5,10 +5,10 @@
  * Released under the MIT License.
  */
 (function (global, factory) {
-	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-	typeof define === 'function' && define.amd ? define(['exports'], factory) :
-	(global = global || self, factory(global.SphericalImage = {}));
-}(this, function (exports) { 'use strict';
+	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
+	typeof define === 'function' && define.amd ? define(factory) :
+	(global = global || self, global.SphericalImage = factory());
+}(this, function () { 'use strict';
 
 	var Matrix4 = (function () {
 	    function Matrix4() {
@@ -156,7 +156,7 @@
 	    var sinTheta = Math.sin(theta);
 	    var cosTheta = Math.cos(theta);
 	    for (var longNumber = 0; longNumber <= LONGITUDE_BANDS; longNumber++) {
-	        var phi = longNumber * 2 * Math.PI / LONGITUDE_BANDS;
+	        var phi = longNumber * 2 * Math.PI / LONGITUDE_BANDS + Math.PI / 2;
 	        var sinPhi = Math.sin(phi);
 	        var cosPhi = Math.cos(phi);
 	        var x = cosPhi * sinTheta;
@@ -191,42 +191,70 @@
 	var POSITION_BUFFER_DATA = new Float32Array(vertexPositionData);
 	var NORMAL_BUFFER_DATA = new Float32Array(normalData);
 	var TEXTURE_COORD_BUFFER_DATA = new Float32Array(textureCoordData);
-	var SphiricalObject = (function (_super) {
-	    __extends(SphiricalObject, _super);
-	    function SphiricalObject(textureSource) {
+	var ATTRIBUTES = {
+	    index: {
+	        array: INDEX_BUFFER_DATA,
+	        itemSize: 1,
+	        numItems: INDEX_BUFFER_DATA.length,
+	    },
+	    position: {
+	        array: POSITION_BUFFER_DATA,
+	        itemSize: 3,
+	        numItems: POSITION_BUFFER_DATA.length / 3,
+	    },
+	    normal: {
+	        array: NORMAL_BUFFER_DATA,
+	        itemSize: 3,
+	        numItems: NORMAL_BUFFER_DATA.length / 3,
+	    },
+	    textureCoord: {
+	        array: TEXTURE_COORD_BUFFER_DATA,
+	        itemSize: 2,
+	        numItems: TEXTURE_COORD_BUFFER_DATA.length / 3,
+	    },
+	};
+	var SphereMesh = (function (_super) {
+	    __extends(SphereMesh, _super);
+	    function SphereMesh(textureSource, initialRotationPhi, initialRotationTheta) {
 	        var _this = _super.call(this) || this;
-	        _this.attributes = {
-	            index: {
-	                array: INDEX_BUFFER_DATA,
-	                itemSize: 1,
-	                numItems: INDEX_BUFFER_DATA.length,
-	            },
-	            position: {
-	                array: POSITION_BUFFER_DATA,
-	                itemSize: 3,
-	                numItems: POSITION_BUFFER_DATA.length / 3,
-	            },
-	            normal: {
-	                array: NORMAL_BUFFER_DATA,
-	                itemSize: 3,
-	                numItems: NORMAL_BUFFER_DATA.length / 3,
-	            },
-	            textureCoord: {
-	                array: TEXTURE_COORD_BUFFER_DATA,
-	                itemSize: 2,
-	                numItems: TEXTURE_COORD_BUFFER_DATA.length / 3,
-	            },
-	        };
-	        _this.baseTexture = EMPTY_TEXTURE;
+	        _this._baseTexture = EMPTY_TEXTURE;
+	        _this._modelMatrix = new Matrix4;
+	        _this._modelMatrix.makeRotationFromEulerXYZ(initialRotationPhi, initialRotationTheta, 0);
+	        Object.defineProperty(_this, 'initialRotationPhi', { value: initialRotationPhi });
+	        Object.defineProperty(_this, 'initialRotationTheta', { value: initialRotationTheta });
 	        _this.updateTexture(textureSource);
 	        return _this;
 	    }
-	    SphiricalObject.prototype.updateTexture = function (textureSource) {
+	    Object.defineProperty(SphereMesh.prototype, "attributes", {
+	        get: function () {
+	            return ATTRIBUTES;
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	    Object.defineProperty(SphereMesh.prototype, "modelMatrix", {
+	        get: function () {
+	            return this._modelMatrix;
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	    Object.defineProperty(SphereMesh.prototype, "baseTexture", {
+	        get: function () {
+	            return this._baseTexture;
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	    SphereMesh.prototype.rotate = function (phi, theta) {
+	        this._modelMatrix.makeRotationFromEulerXYZ(phi, theta, 0);
+	    };
+	    SphereMesh.prototype.updateTexture = function (textureSource) {
 	        var _this = this;
 	        if (typeof textureSource === 'string') {
 	            var image_1 = new Image();
 	            var onload_1 = function () {
-	                _this.baseTexture = image_1;
+	                _this._baseTexture = image_1;
 	                _this.dispatchEvent({ type: 'textureUpdated' });
 	                image_1.removeEventListener('load', onload_1);
 	            };
@@ -234,48 +262,55 @@
 	            image_1.src = textureSource;
 	        }
 	        else if (textureSource instanceof HTMLCanvasElement) {
-	            this.baseTexture = textureSource;
+	            this._baseTexture = textureSource;
 	            this.dispatchEvent({ type: 'textureUpdated' });
 	        }
 	    };
-	    return SphiricalObject;
+	    return SphereMesh;
 	}(EventDispatcher));
 
 	var DEG2RAD = Math.PI / 180;
 	var PI_HALF = Math.PI * 0.5;
-	var vsSource = "\nattribute vec3 aVertexPosition;\nattribute vec2 aTextureCoord;\n\nuniform mat4 uProjectionMatrix;\nuniform mat4 uViewMatrix;\n\nvarying vec2 vTextureCoord;\n\nvoid main(void) {\n\tgl_Position = uProjectionMatrix * uViewMatrix * vec4( aVertexPosition, 1.0 );\n\tvTextureCoord = aTextureCoord;\n}\n";
-	var fsSource = "\nprecision mediump float;\n\nvarying vec2 vTextureCoord;\nuniform sampler2D uSampler;\n\nvoid main( void ) {\n\tvec4 textureColor = texture2D( uSampler, vTextureCoord );\n\tgl_FragColor = vec4( textureColor.rgb, 1.0 );\n}\n";
-	var Renderer = (function () {
-	    function Renderer(canvas, textureSource) {
+	var CAMERA_FOV = 45;
+	var CAMERA_NEAR = 0.1;
+	var CAMERA_FAR = 100;
+	var VERTEX_SHADER_SOURCE = "\nattribute vec3 aVertexPosition;\nattribute vec2 aTextureCoord;\n\nuniform mat4 uProjectionMatrix;\nuniform mat4 uViewMatrix;\nuniform mat4 uModelMatrix;\n\nvarying vec2 vTextureCoord;\n\nvoid main(void) {\n\tgl_Position = uProjectionMatrix * uModelMatrix * uViewMatrix * vec4( aVertexPosition, 1.0 );\n\tvTextureCoord = aTextureCoord;\n}\n";
+	var FRAGMENT_SHADER_SOURCE = "\nprecision mediump float;\n\nvarying vec2 vTextureCoord;\nuniform sampler2D uSampler;\n\nvoid main( void ) {\n\tvec4 textureColor = texture2D( uSampler, vTextureCoord );\n\tgl_FragColor = vec4( textureColor.rgb, 1.0 );\n}\n";
+	var SphericalImage = (function () {
+	    function SphericalImage(canvas, textureSource, options) {
+	        if (options === void 0) { options = {
+	            initialRotationPhi: 0,
+	            initialRotationTheta: 0,
+	        }; }
 	        var _this = this;
 	        var scope = this;
-	        this.canvas = canvas;
-	        this.width = canvas.width;
-	        this.height = canvas.height;
-	        this.willRender = true;
-	        this.gl = canvas.getContext('experimental-webgl');
-	        this.gl.viewport(0, 0, this.width, this.height);
-	        this.gl.clearColor(0, 0, 0, 1);
-	        this.gl.enable(this.gl.DEPTH_TEST);
-	        this.shaderProgram = createShaderProgram(this.gl);
-	        this.projectionMatrix = new Matrix4();
-	        this.projectionMatrix.perspective(45, this.width / this.height, 0.1, 100);
-	        this.viewMatrix = new Matrix4();
-	        this.cameraRotation = [0, 0, 0];
-	        this.webGLProperties = new WeakMap();
-	        this.sphiricalObject0 = new SphiricalObject(textureSource);
-	        this.webGLProperties.set(this.sphiricalObject0, uploadObject(this.gl, this.shaderProgram, this.sphiricalObject0));
-	        this.willRender = true;
-	        this.sphiricalObject0.addEventListener('textureUpdated', function () { return _this.willRender = true; });
+	        this._canvas = canvas;
+	        this._width = canvas.width;
+	        this._height = canvas.height;
+	        this._willRender = true;
+	        this._gl = canvas.getContext('experimental-webgl');
+	        this._gl.viewport(0, 0, this._width, this._height);
+	        this._gl.clearColor(0, 0, 0, 1);
+	        this._gl.enable(this._gl.DEPTH_TEST);
+	        this._shaderProgram = createShaderProgram(this._gl);
+	        this._projectionMatrix = new Matrix4();
+	        this._projectionMatrix.perspective(CAMERA_FOV, this._width / this._height, CAMERA_NEAR, CAMERA_FAR);
+	        this._viewMatrix = new Matrix4();
+	        this._cameraRotation = [0, 0, 0];
+	        this._webGLProperties = new WeakMap();
+	        this._sphereMesh0 = new SphereMesh(textureSource, options.initialRotationPhi, options.initialRotationTheta);
+	        this._webGLProperties.set(this._sphereMesh0, uploadObject(this._gl, this._shaderProgram, this._sphereMesh0));
+	        this._willRender = true;
+	        this._sphereMesh0.addEventListener('textureUpdated', function () { return _this._willRender = true; });
 	        (function tick() {
 	            requestAnimationFrame(tick);
-	            scope.render();
+	            scope._render();
 	        })();
 	        var lastDragX = 0;
 	        var lastDragY = 0;
-	        this.canvas.addEventListener('mousedown', onMouseDown);
-	        this.canvas.addEventListener('touchstart', onTouchStart);
-	        this.canvas.addEventListener('contextmenu', onContextMenu);
+	        this._canvas.addEventListener('mousedown', onMouseDown);
+	        this._canvas.addEventListener('touchstart', onTouchStart);
+	        this._canvas.addEventListener('contextmenu', onContextMenu);
 	        function onMouseDown(event) {
 	            event.preventDefault();
 	            startDragging(event);
@@ -300,9 +335,9 @@
 	            var _event = normalizePointerEvent(event);
 	            var deltaX = _event.pageX - lastDragX;
 	            var deltaY = _event.pageY - lastDragY;
-	            scope.cameraRotation[0] += (deltaY * -0.1) * DEG2RAD;
-	            scope.cameraRotation[1] += (deltaX * -0.1) * DEG2RAD;
-	            scope.willRender = true;
+	            scope._cameraRotation[0] += (deltaY * -0.1) * DEG2RAD;
+	            scope._cameraRotation[1] += (deltaX * -0.1) * DEG2RAD;
+	            scope._willRender = true;
 	            lastDragX = _event.pageX;
 	            lastDragY = _event.pageY;
 	        }
@@ -313,40 +348,48 @@
 	            document.removeEventListener('touchend', endDragging);
 	        }
 	    }
-	    Renderer.prototype.render = function () {
-	        if (!this.willRender)
-	            return;
-	        var gl = this.gl;
-	        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	        this.cameraRotation[0] = Math.min(this.cameraRotation[0], PI_HALF - 1e-10);
-	        this.cameraRotation[0] = Math.max(this.cameraRotation[0], -PI_HALF + 1e-10);
-	        this.viewMatrix.makeRotationFromEulerXYZ(this.cameraRotation[0], this.cameraRotation[1], 0);
-	        this.renderObject(this.sphiricalObject0);
-	        this.willRender = false;
+	    SphericalImage.prototype.setSize = function (width, height) {
+	        this._width = width;
+	        this._height = height;
+	        this._gl.viewport(0, 0, this._width, this._height);
+	        this._projectionMatrix.perspective(CAMERA_FOV, this._width / this._height, CAMERA_NEAR, CAMERA_FAR);
+	        this._willRender = true;
 	    };
-	    Renderer.prototype.renderObject = function (object) {
-	        var gl = this.gl;
-	        var webGLProperty = this.webGLProperties.get(object);
+	    SphericalImage.prototype._render = function () {
+	        if (!this._willRender)
+	            return;
+	        var gl = this._gl;
+	        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	        this._cameraRotation[0] = Math.min(this._cameraRotation[0], PI_HALF - 1e-10);
+	        this._cameraRotation[0] = Math.max(this._cameraRotation[0], -PI_HALF + 1e-10);
+	        this._viewMatrix.makeRotationFromEulerXYZ(this._cameraRotation[0], this._cameraRotation[1], 0);
+	        this._renderObject(this._sphereMesh0);
+	        this._willRender = false;
+	    };
+	    SphericalImage.prototype._renderObject = function (object) {
+	        var gl = this._gl;
+	        var webGLProperty = this._webGLProperties.get(object);
 	        gl.activeTexture(gl.TEXTURE0);
 	        gl.bindTexture(gl.TEXTURE_2D, webGLProperty.uniformValues.textureValue);
 	        gl.uniform1i(webGLProperty.uniformLocations.textureLocation, 0);
 	        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, webGLProperty.attributeBuffers.indexBuffer);
 	        gl.bindBuffer(gl.ARRAY_BUFFER, webGLProperty.attributeBuffers.positionBuffer);
-	        gl.vertexAttribPointer(webGLProperty.attributeLocations.positionLocation, this.sphiricalObject0.attributes.position.itemSize, gl.FLOAT, false, 0, 0);
+	        gl.vertexAttribPointer(webGLProperty.attributeLocations.positionLocation, this._sphereMesh0.attributes.position.itemSize, gl.FLOAT, false, 0, 0);
 	        gl.bindBuffer(gl.ARRAY_BUFFER, webGLProperty.attributeBuffers.textureCoordBuffer);
-	        gl.vertexAttribPointer(webGLProperty.attributeLocations.textureCoordLocation, this.sphiricalObject0.attributes.textureCoord.itemSize, gl.FLOAT, false, 0, 0);
-	        gl.uniformMatrix4fv(webGLProperty.uniformLocations.projectionMatrixLocation, false, this.projectionMatrix.extract());
-	        gl.uniformMatrix4fv(webGLProperty.uniformLocations.viewMatrixLocation, false, this.viewMatrix.extract());
-	        gl.drawElements(gl.TRIANGLES, this.sphiricalObject0.attributes.index.numItems, gl.UNSIGNED_SHORT, 0);
+	        gl.vertexAttribPointer(webGLProperty.attributeLocations.textureCoordLocation, this._sphereMesh0.attributes.textureCoord.itemSize, gl.FLOAT, false, 0, 0);
+	        gl.uniformMatrix4fv(webGLProperty.uniformLocations.modelMatrixLocation, false, this._sphereMesh0.modelMatrix.extract());
+	        gl.uniformMatrix4fv(webGLProperty.uniformLocations.viewMatrixLocation, false, this._viewMatrix.extract());
+	        gl.uniformMatrix4fv(webGLProperty.uniformLocations.projectionMatrixLocation, false, this._projectionMatrix.extract());
+	        gl.drawElements(gl.TRIANGLES, this._sphereMesh0.attributes.index.numItems, gl.UNSIGNED_SHORT, 0);
 	    };
-	    return Renderer;
+	    return SphericalImage;
 	}());
 	function createShaderProgram(gl) {
 	    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-	    gl.shaderSource(vertexShader, vsSource);
+	    gl.shaderSource(vertexShader, VERTEX_SHADER_SOURCE);
 	    gl.compileShader(vertexShader);
 	    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-	    gl.shaderSource(fragmentShader, fsSource);
+	    gl.shaderSource(fragmentShader, FRAGMENT_SHADER_SOURCE);
 	    gl.compileShader(fragmentShader);
 	    var shaderProgram = gl.createProgram();
 	    gl.attachShader(shaderProgram, vertexShader);
@@ -372,6 +415,7 @@
 	        uniformLocations: {
 	            projectionMatrixLocation: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
 	            viewMatrixLocation: gl.getUniformLocation(shaderProgram, 'uViewMatrix'),
+	            modelMatrixLocation: gl.getUniformLocation(shaderProgram, 'uModelMatrix'),
 	            textureLocation: gl.getUniformLocation(shaderProgram, 'uSampler'),
 	        }
 	    };
@@ -402,8 +446,6 @@
 	    return 'ontouchstart' in window && event instanceof TouchEvent ? event.touches[0] : event;
 	}
 
-	exports.Renderer = Renderer;
-
-	Object.defineProperty(exports, '__esModule', { value: true });
+	return SphericalImage;
 
 }));
