@@ -23,8 +23,11 @@ interface WebGLProperty {
 
 const DEG2RAD = Math.PI / 180;
 const PI_HALF = Math.PI * 0.5;
+const CAMERA_FOV = 45; // in deg
+const CAMERA_NEAR = 0.1;
+const CAMERA_FAR = 100;
 
-const vsSource = `
+const VERTEX_SHADER_SOURCE = `
 attribute vec3 aVertexPosition;
 attribute vec2 aTextureCoord;
 
@@ -39,7 +42,7 @@ void main(void) {
 }
 `;
 
-const fsSource = `
+const FRAGMENT_SHADER_SOURCE = `
 precision mediump float;
 
 varying vec2 vTextureCoord;
@@ -53,68 +56,68 @@ void main( void ) {
 
 export class Renderer {
 
-	private canvas: HTMLCanvasElement;
-	private width: number;
-	private height: number;
-	private willRender: boolean;
-	private gl: WebGLRenderingContext;
-	private shaderProgram: WebGLProgram;
-	private projectionMatrix: Matrix4;
-	private viewMatrix: Matrix4;
-	private cameraRotation: [ number, number, number ];
-	private webGLProperties: WeakMap<SphiricalObject, WebGLProperty>;
-	private sphiricalObject0: SphiricalObject;
+	private _canvas: HTMLCanvasElement;
+	private _width: number;
+	private _height: number;
+	private _willRender: boolean;
+	private _gl: WebGLRenderingContext;
+	private _shaderProgram: WebGLProgram;
+	private _projectionMatrix: Matrix4;
+	private _viewMatrix: Matrix4;
+	private _cameraRotation: [ number, number, number ];
+	private _webGLProperties: WeakMap<SphiricalObject, WebGLProperty>;
+	private _sphiricalObject0: SphiricalObject;
 
 	constructor( canvas: HTMLCanvasElement, textureSource: string | HTMLCanvasElement ) {
 
 		const scope = this;
 
-		this.canvas = canvas;
-		this.width = canvas.width;
-		this.height = canvas.height;
-		this.willRender = true;
+		this._canvas = canvas;
+		this._width = canvas.width;
+		this._height = canvas.height;
+		this._willRender = true;
 
-		this.gl = canvas.getContext( 'experimental-webgl' )!;
-		this.gl.viewport( 0, 0, this.width, this.height );
-		this.gl.clearColor( 0, 0, 0, 1 );
-		this.gl.enable( this.gl.DEPTH_TEST );
+		this._gl = canvas.getContext( 'experimental-webgl' )!;
+		this._gl.viewport( 0, 0, this._width, this._height );
+		this._gl.clearColor( 0, 0, 0, 1 );
+		this._gl.enable( this._gl.DEPTH_TEST );
 
-		this.shaderProgram = createShaderProgram( this.gl );
+		this._shaderProgram = createShaderProgram( this._gl );
 
-		this.projectionMatrix = new Matrix4();
-		this.projectionMatrix.perspective( 45, this.width / this.height, 0.1, 100 );
+		this._projectionMatrix = new Matrix4();
+		this._projectionMatrix.perspective( CAMERA_FOV, this._width / this._height, CAMERA_NEAR, CAMERA_FAR );
 
-		this.viewMatrix = new Matrix4();
+		this._viewMatrix = new Matrix4();
 
-		this.cameraRotation = [ 0, 0, 0 ];
-		this.webGLProperties = new WeakMap();
+		this._cameraRotation = [ 0, 0, 0 ];
+		this._webGLProperties = new WeakMap();
 
-		this.sphiricalObject0 = new SphiricalObject( textureSource );
-		this.webGLProperties.set(
-			this.sphiricalObject0,
-			uploadObject( this.gl, this.shaderProgram, this.sphiricalObject0 )
+		this._sphiricalObject0 = new SphiricalObject( textureSource );
+		this._webGLProperties.set(
+			this._sphiricalObject0,
+			uploadObject( this._gl, this._shaderProgram, this._sphiricalObject0 )
 		);
 
-		this.willRender = true;
-		this.sphiricalObject0.addEventListener( 'textureUpdated', () => this.willRender = true );
+		this._willRender = true;
+		this._sphiricalObject0.addEventListener( 'textureUpdated', () => this._willRender = true );
 
 		// ( function tick( elapsed: number ) {
 		( function tick() {
 
 			// if ( elapsed > 10000 ) return;
 			requestAnimationFrame( tick );
-			scope.render();
+			scope._render();
 
 		} )();
 
 
 		// mouse events
-		let lastDragX = 0;
-		let lastDragY = 0;
+		let lastDragX: number = 0;
+		let lastDragY: number = 0;
 
-		this.canvas.addEventListener( 'mousedown', onMouseDown );
-		this.canvas.addEventListener( 'touchstart', onTouchStart );
-		this.canvas.addEventListener( 'contextmenu', onContextMenu );
+		this._canvas.addEventListener( 'mousedown', onMouseDown );
+		this._canvas.addEventListener( 'touchstart', onTouchStart );
+		this._canvas.addEventListener( 'contextmenu', onContextMenu );
 
 		function onMouseDown( event: MouseEvent ):void {
 
@@ -150,23 +153,23 @@ export class Renderer {
 
 		}
 
-		function dragging( event: MouseEvent | TouchEvent ):void {
+		function dragging( event: MouseEvent | TouchEvent ): void {
 
 			const _event = normalizePointerEvent( event );
 
 			const deltaX = _event.pageX - lastDragX;
 			const deltaY = _event.pageY - lastDragY;
 
-			scope.cameraRotation[ 0 ] += ( deltaY * - 0.1 ) * DEG2RAD;
-			scope.cameraRotation[ 1 ] += ( deltaX * - 0.1 ) * DEG2RAD;
-			scope.willRender = true;
+			scope._cameraRotation[ 0 ] += ( deltaY * - 0.1 ) * DEG2RAD;
+			scope._cameraRotation[ 1 ] += ( deltaX * - 0.1 ) * DEG2RAD;
+			scope._willRender = true;
 
 			lastDragX = _event.pageX;
 			lastDragY = _event.pageY;
 
 		}
 
-		function endDragging():void {
+		function endDragging(): void {
 
 			document.removeEventListener( 'mousemove', dragging );
 			document.removeEventListener( 'touchmove', dragging );
@@ -177,36 +180,47 @@ export class Renderer {
 
 	}
 
-	render() {
+	public setSize( width: number, height: number ): void {
 
-		if ( ! this.willRender ) return;
+		this._width = width;
+		this._height = height;
 
-		const gl = this.gl;
-
-		gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
-
-		this.cameraRotation[ 0 ] = Math.min(
-			this.cameraRotation[ 0 ], PI_HALF - 1e-10
-		);
-		this.cameraRotation[ 0 ] = Math.max(
-			this.cameraRotation[ 0 ], - PI_HALF + 1e-10
-		);
-
-		this.viewMatrix.makeRotationFromEulerXYZ(
-			this.cameraRotation[ 0 ],
-			this.cameraRotation[ 1 ],
-			0
-		);
-
-		this.renderObject( this.sphiricalObject0 );
-		this.willRender = false;
+		this._gl.viewport( 0, 0, this._width, this._height );
+		this._projectionMatrix.perspective( CAMERA_FOV, this._width / this._height, CAMERA_NEAR, CAMERA_FAR );
+		this._willRender = true;
 
 	}
 
-	renderObject( object: SphiricalObject ): void {
+	private _render(): void {
 
-		const gl = this.gl;
-		const webGLProperty = this.webGLProperties.get( object )!;
+		if ( ! this._willRender ) return;
+
+		const gl = this._gl;
+
+		gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
+
+		this._cameraRotation[ 0 ] = Math.min(
+			this._cameraRotation[ 0 ], PI_HALF - 1e-10
+		);
+		this._cameraRotation[ 0 ] = Math.max(
+			this._cameraRotation[ 0 ], - PI_HALF + 1e-10
+		);
+
+		this._viewMatrix.makeRotationFromEulerXYZ(
+			this._cameraRotation[ 0 ],
+			this._cameraRotation[ 1 ],
+			0
+		);
+
+		this._renderObject( this._sphiricalObject0 );
+		this._willRender = false;
+
+	}
+
+	private _renderObject( object: SphiricalObject ): void {
+
+		const gl = this._gl;
+		const webGLProperty = this._webGLProperties.get( object )!;
 
 		gl.activeTexture( gl.TEXTURE0 );
 		gl.bindTexture( gl.TEXTURE_2D, webGLProperty.uniformValues.textureValue );
@@ -217,7 +231,7 @@ export class Renderer {
 		gl.bindBuffer( gl.ARRAY_BUFFER, webGLProperty.attributeBuffers.positionBuffer );
 		gl.vertexAttribPointer(
 			webGLProperty.attributeLocations.positionLocation,
-			this.sphiricalObject0.attributes.position.itemSize,
+			this._sphiricalObject0.attributes.position.itemSize,
 			gl.FLOAT,
 			false,
 			0,
@@ -227,7 +241,7 @@ export class Renderer {
 		gl.bindBuffer( gl.ARRAY_BUFFER, webGLProperty.attributeBuffers.textureCoordBuffer );
 		gl.vertexAttribPointer(
 			webGLProperty.attributeLocations.textureCoordLocation,
-			this.sphiricalObject0.attributes.textureCoord.itemSize,
+			this._sphiricalObject0.attributes.textureCoord.itemSize,
 			gl.FLOAT,
 			false,
 			0,
@@ -237,18 +251,18 @@ export class Renderer {
 		gl.uniformMatrix4fv(
 			webGLProperty.uniformLocations.projectionMatrixLocation,
 			false,
-			this.projectionMatrix.extract()
+			this._projectionMatrix.extract()
 		);
 		gl.uniformMatrix4fv(
 			webGLProperty.uniformLocations.viewMatrixLocation,
 			false,
-			this.viewMatrix.extract()
+			this._viewMatrix.extract()
 		);
 
 
 		gl.drawElements(
 			gl.TRIANGLES,
-			this.sphiricalObject0.attributes.index.numItems,
+			this._sphiricalObject0.attributes.index.numItems,
 			gl.UNSIGNED_SHORT,
 			0
 		);
@@ -257,14 +271,14 @@ export class Renderer {
 
 }
 
-function createShaderProgram( gl: WebGLRenderingContext ) {
+function createShaderProgram( gl: WebGLRenderingContext ): WebGLProgram {
 
 	const vertexShader = gl.createShader( gl.VERTEX_SHADER )!;
-	gl.shaderSource( vertexShader, vsSource );
+	gl.shaderSource( vertexShader, VERTEX_SHADER_SOURCE );
 	gl.compileShader( vertexShader );
 
 	const fragmentShader = gl.createShader( gl.FRAGMENT_SHADER )!;
-	gl.shaderSource( fragmentShader, fsSource );
+	gl.shaderSource( fragmentShader, FRAGMENT_SHADER_SOURCE );
 	gl.compileShader( fragmentShader );
 
 	const shaderProgram = gl.createProgram()!;
@@ -327,7 +341,7 @@ function uploadObject( gl: WebGLRenderingContext, shaderProgram: WebGLProgram, o
 
 }
 
-function uploadTexture( gl: WebGLRenderingContext, baseTexture: BaseTexture, webglTexture: WebGLTexture ) {
+function uploadTexture( gl: WebGLRenderingContext, baseTexture: BaseTexture, webglTexture: WebGLTexture ): void {
 
 	gl.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, + true );
 	gl.bindTexture( gl.TEXTURE_2D, webglTexture );
@@ -346,7 +360,6 @@ function uploadTexture( gl: WebGLRenderingContext, baseTexture: BaseTexture, web
 	gl.bindTexture( gl.TEXTURE_2D, null );
 
 }
-
 
 function normalizePointerEvent( event: MouseEvent | TouchEvent | WheelEvent ): any {
 

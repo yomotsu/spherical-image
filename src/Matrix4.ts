@@ -9,13 +9,13 @@ export class Matrix4 {
 
 	}
 
-	extract(): Float32Array {
+	public extract(): Float32Array {
 
 		return this._array;
 
 	}
 
-	identity(): this {
+	public identity(): this {
 
 		const array = this._array;
 
@@ -40,7 +40,7 @@ export class Matrix4 {
 
 	}
 
-	// multiply( mat4: Matrix4 ): this {
+	// public multiply( mat4: Matrix4 ): this {
 
 	// 	const a = this._array;
 	// 	const b = mat4;
@@ -79,7 +79,7 @@ export class Matrix4 {
 
 	// }
 
-	// translate( x: number, y: number, z: number ): this {
+	// public translate( x: number, y: number, z: number ): this {
 
 	// 	const array = this._array;
 
@@ -92,7 +92,7 @@ export class Matrix4 {
 
 	// }
 
-	makeRotationFromEulerXYZ( x: number, y: number, z: number ): this {
+	public makeRotationFromEulerXYZ( x: number, y: number, z: number ): this {
 
 		const array = this._array;
 
@@ -129,7 +129,7 @@ export class Matrix4 {
 
 	}
 
-	perspective( fovy: number, aspect: number, near: number, far: number ): this {
+	public perspective( fovy: number, aspect: number, near: number, far: number ): this {
 
 		const array = this._array;
 		const f = 1.0 / Math.tan( fovy * 0.5 );

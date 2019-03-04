@@ -1,27 +1,5 @@
 import { EventDispatcher } from './EventDispatcher';
 export type BaseTexture = HTMLImageElement | HTMLCanvasElement;
-interface Attributes {
-	index: {
-		array: Uint16Array;
-		itemSize: number;
-		numItems: number;
-	},
-	position: {
-		array: Float32Array;
-		itemSize: number;
-		numItems: number;
-	},
-	normal: {
-		array: Float32Array;
-		itemSize: number;
-		numItems: number;
-	},
-	textureCoord: {
-		array: Float32Array;
-		itemSize: number;
-		numItems: number;
-	},
-};
 
 const EMPTY_TEXTURE = document.createElement( 'canvas' );
 EMPTY_TEXTURE.width = 1;
@@ -90,54 +68,64 @@ const INDEX_BUFFER_DATA = new Uint16Array( indexData );
 const POSITION_BUFFER_DATA = new Float32Array( vertexPositionData );
 const NORMAL_BUFFER_DATA = new Float32Array( normalData );
 const TEXTURE_COORD_BUFFER_DATA = new Float32Array( textureCoordData );
+const ATTRIBUTES = {
+	index: {
+		array: INDEX_BUFFER_DATA,
+		itemSize: 1,
+		numItems: INDEX_BUFFER_DATA.length,
+	},
+	position: {
+		array: POSITION_BUFFER_DATA,
+		itemSize: 3,
+		numItems: POSITION_BUFFER_DATA.length / 3,
+	},
+	normal: {
+		array: NORMAL_BUFFER_DATA,
+		itemSize: 3,
+		numItems: NORMAL_BUFFER_DATA.length / 3,
+	},
+	textureCoord: {
+		array: TEXTURE_COORD_BUFFER_DATA,
+		itemSize: 2,
+		numItems: TEXTURE_COORD_BUFFER_DATA.length / 3,
+	},
+};
 
 export class SphiricalObject extends EventDispatcher {
 
-	public baseTexture: BaseTexture;
-	public attributes: Attributes;
+	private _baseTexture: BaseTexture;
 
 	constructor( textureSource: string | HTMLCanvasElement ) {
 
 		super();
 
-		this.attributes = {
-			index: {
-				array: INDEX_BUFFER_DATA,
-				itemSize: 1,
-				numItems: INDEX_BUFFER_DATA.length,
-			},
-			position: {
-				array: POSITION_BUFFER_DATA,
-				itemSize: 3,
-				numItems: POSITION_BUFFER_DATA.length / 3,
-			},
-			normal: {
-				array: NORMAL_BUFFER_DATA,
-				itemSize: 3,
-				numItems: NORMAL_BUFFER_DATA.length / 3,
-			},
-			textureCoord: {
-				array: TEXTURE_COORD_BUFFER_DATA,
-				itemSize: 2,
-				numItems: TEXTURE_COORD_BUFFER_DATA.length / 3,
-			},
-		};
-
-		this.baseTexture = EMPTY_TEXTURE;
+		this._baseTexture = EMPTY_TEXTURE;
 		// this.modelMatrix = null;
 
 		this.updateTexture( textureSource );
 
 	}
 
-	updateTexture( textureSource: string | HTMLCanvasElement ): void {
+	get attributes() {
+
+		return ATTRIBUTES;
+
+	}
+
+	get baseTexture() {
+
+		return this._baseTexture;
+
+	}
+
+	public updateTexture( textureSource: string | HTMLCanvasElement ): void {
 
 		if ( typeof textureSource === 'string' ) {
 
 			const image = new Image();
 			const onload = () => {
 
-				this.baseTexture = image;
+				this._baseTexture = image;
 				this.dispatchEvent( { type: 'textureUpdated' } );
 				image.removeEventListener( 'load', onload );
 
@@ -147,7 +135,7 @@ export class SphiricalObject extends EventDispatcher {
 
 		} else if ( textureSource instanceof HTMLCanvasElement ) {
 
-			this.baseTexture = textureSource;
+			this._baseTexture = textureSource;
 			this.dispatchEvent( { type: 'textureUpdated' } );
 
 		}
