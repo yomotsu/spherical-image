@@ -13,15 +13,15 @@ Drag to rotate<br>
 
 <script src="../dist/spherical-image.js"></script>
 <script>
+const sphericalImage0 = new SphericalImage( document.getElementById( 'canvas0' ), './img.jpg' );
 
-const sphericalImage = new SphericalImage(
-	document.getElementById( 'canvas0' ),
-	'./img.jpg'
-);
-
-new SphericalImage(
-	document.getElementById( 'canvas1' ),
-	'./img.jpg'
+const sphericalImage1 = new SphericalImage(
+  document.getElementById( 'canvas1' ),
+  './img.jpg',
+  {
+    initialRotationPhi: Math.PI,
+    initialRotationTheta: Math.PI,
+  }
 );
 </script>
 

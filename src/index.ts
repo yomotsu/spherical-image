@@ -1,2 +1,2 @@
-import { Renderer } from './Renderer';
-export default Renderer;
+import { SphericalImage } from './SphericalImage';
+export default SphericalImage;

@@ -1,5 +1,7 @@
 import { EventDispatcher } from './EventDispatcher';
-export type BaseTexture = HTMLImageElement | HTMLCanvasElement;
+import { Matrix4 } from 'Matrix4';
+export type TextureSource = string | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
+export type BaseTexture = HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
 
 const EMPTY_TEXTURE = document.createElement( 'canvas' );
 EMPTY_TEXTURE.width = 1;
@@ -21,7 +23,7 @@ for ( let latNumber = 0; latNumber <= LATITUDE_BANDS; latNumber ++ ) {
 
 	for ( let longNumber = 0; longNumber <= LONGITUDE_BANDS; longNumber ++ ) {
 
-		const phi = longNumber * 2 * Math.PI / LONGITUDE_BANDS;
+		const phi = longNumber * 2 * Math.PI / LONGITUDE_BANDS + Math.PI / 2;
 		const sinPhi = Math.sin( phi );
 		const cosPhi = Math.cos( phi );
 
@@ -91,16 +93,29 @@ const ATTRIBUTES = {
 	},
 };
 
-export class SphiricalObject extends EventDispatcher {
+export class SphereMesh extends EventDispatcher {
 
 	private _baseTexture: BaseTexture;
+	private _modelMatrix: Matrix4;
 
-	constructor( textureSource: string | HTMLCanvasElement ) {
+	constructor(
+		textureSource: TextureSource,
+		initialRotationPhi: number,
+		initialRotationTheta: number,
+	) {
 
 		super();
 
 		this._baseTexture = EMPTY_TEXTURE;
-		// this.modelMatrix = null;
+		this._modelMatrix = new Matrix4;
+		this._modelMatrix.makeRotationFromEulerXYZ(
+			initialRotationPhi,
+			initialRotationTheta,
+			0,
+		);
+
+		Object.defineProperty( this, 'initialRotationPhi',   { value: initialRotationPhi } );
+		Object.defineProperty( this, 'initialRotationTheta', { value: initialRotationTheta } );
 
 		this.updateTexture( textureSource );
 
@@ -112,13 +127,27 @@ export class SphiricalObject extends EventDispatcher {
 
 	}
 
+	get modelMatrix() {
+
+		return this._modelMatrix;
+
+	}
+
 	get baseTexture() {
 
 		return this._baseTexture;
 
 	}
 
-	public updateTexture( textureSource: string | HTMLCanvasElement ): void {
+	public rotate( phi: number, theta: number ): void {
+		this._modelMatrix.makeRotationFromEulerXYZ(
+			phi,
+			theta,
+			0,
+		);
+	}
+
+	public updateTexture( textureSource: TextureSource ): void {
 
 		if ( typeof textureSource === 'string' ) {
 

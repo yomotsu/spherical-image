@@ -21,7 +21,7 @@ then
 ```
 
 ```javascript
-import { SphericalImage } from 'spherical-image';
+import SphericalImage from 'spherical-image';
 
 new SphericalImage(
   document.getElementById( 'myCanvas' ),
@@ -36,7 +36,7 @@ or
 ```
 
 ```javascript
-const renderer0 = new SphericalImage(
+const sphericalImage = new SphericalImage(
   document.getElementById( 'canvas0' ),
   './img.jpg'
 );

@@ -1,5 +1,5 @@
 import { Matrix4 } from './Matrix4';
-import { SphiricalObject, BaseTexture } from './SphiricalObject';
+import { SphereMesh, TextureSource, BaseTexture } from './SphereMesh';
 
 interface WebGLProperty {
 	attributeBuffers: {
@@ -17,8 +17,14 @@ interface WebGLProperty {
 	uniformLocations: {
 		projectionMatrixLocation: WebGLUniformLocation | null,
 		viewMatrixLocation: WebGLUniformLocation | null,
+		modelMatrixLocation: WebGLUniformLocation | null,
 		textureLocation: WebGLUniformLocation | null,
 	}
+}
+
+interface Options {
+	initialRotationPhi: number;
+	initialRotationTheta: number;
 }
 
 const DEG2RAD = Math.PI / 180;
@@ -33,11 +39,12 @@ attribute vec2 aTextureCoord;
 
 uniform mat4 uProjectionMatrix;
 uniform mat4 uViewMatrix;
+uniform mat4 uModelMatrix;
 
 varying vec2 vTextureCoord;
 
 void main(void) {
-	gl_Position = uProjectionMatrix * uViewMatrix * vec4( aVertexPosition, 1.0 );
+	gl_Position = uProjectionMatrix * uModelMatrix * uViewMatrix * vec4( aVertexPosition, 1.0 );
 	vTextureCoord = aTextureCoord;
 }
 `;
@@ -54,7 +61,7 @@ void main( void ) {
 }
 `;
 
-export class Renderer {
+export class SphericalImage {
 
 	private _canvas: HTMLCanvasElement;
 	private _width: number;
@@ -65,10 +72,17 @@ export class Renderer {
 	private _projectionMatrix: Matrix4;
 	private _viewMatrix: Matrix4;
 	private _cameraRotation: [ number, number, number ];
-	private _webGLProperties: WeakMap<SphiricalObject, WebGLProperty>;
-	private _sphiricalObject0: SphiricalObject;
+	private _webGLProperties: WeakMap<SphereMesh, WebGLProperty>;
+	private _sphereMesh0: SphereMesh;
 
-	constructor( canvas: HTMLCanvasElement, textureSource: string | HTMLCanvasElement ) {
+	constructor(
+		canvas: HTMLCanvasElement,
+		textureSource: TextureSource,
+		options: Options = {
+			initialRotationPhi: 0,
+			initialRotationTheta: 0,
+		},
+	) {
 
 		const scope = this;
 
@@ -92,14 +106,18 @@ export class Renderer {
 		this._cameraRotation = [ 0, 0, 0 ];
 		this._webGLProperties = new WeakMap();
 
-		this._sphiricalObject0 = new SphiricalObject( textureSource );
+		this._sphereMesh0 = new SphereMesh(
+			textureSource,
+			options.initialRotationPhi,
+			options.initialRotationTheta,
+		);
 		this._webGLProperties.set(
-			this._sphiricalObject0,
-			uploadObject( this._gl, this._shaderProgram, this._sphiricalObject0 )
+			this._sphereMesh0,
+			uploadObject( this._gl, this._shaderProgram, this._sphereMesh0 )
 		);
 
 		this._willRender = true;
-		this._sphiricalObject0.addEventListener( 'textureUpdated', () => this._willRender = true );
+		this._sphereMesh0.addEventListener( 'textureUpdated', () => this._willRender = true );
 
 		// ( function tick( elapsed: number ) {
 		( function tick() {
@@ -212,12 +230,12 @@ export class Renderer {
 			0
 		);
 
-		this._renderObject( this._sphiricalObject0 );
+		this._renderObject( this._sphereMesh0 );
 		this._willRender = false;
 
 	}
 
-	private _renderObject( object: SphiricalObject ): void {
+	private _renderObject( object: SphereMesh ): void {
 
 		const gl = this._gl;
 		const webGLProperty = this._webGLProperties.get( object )!;
@@ -231,7 +249,7 @@ export class Renderer {
 		gl.bindBuffer( gl.ARRAY_BUFFER, webGLProperty.attributeBuffers.positionBuffer );
 		gl.vertexAttribPointer(
 			webGLProperty.attributeLocations.positionLocation,
-			this._sphiricalObject0.attributes.position.itemSize,
+			this._sphereMesh0.attributes.position.itemSize,
 			gl.FLOAT,
 			false,
 			0,
@@ -241,7 +259,7 @@ export class Renderer {
 		gl.bindBuffer( gl.ARRAY_BUFFER, webGLProperty.attributeBuffers.textureCoordBuffer );
 		gl.vertexAttribPointer(
 			webGLProperty.attributeLocations.textureCoordLocation,
-			this._sphiricalObject0.attributes.textureCoord.itemSize,
+			this._sphereMesh0.attributes.textureCoord.itemSize,
 			gl.FLOAT,
 			false,
 			0,
@@ -249,20 +267,24 @@ export class Renderer {
 		);
 
 		gl.uniformMatrix4fv(
-			webGLProperty.uniformLocations.projectionMatrixLocation,
+			webGLProperty.uniformLocations.modelMatrixLocation,
 			false,
-			this._projectionMatrix.extract()
+			this._sphereMesh0.modelMatrix.extract()
 		);
 		gl.uniformMatrix4fv(
 			webGLProperty.uniformLocations.viewMatrixLocation,
 			false,
 			this._viewMatrix.extract()
 		);
-
+		gl.uniformMatrix4fv(
+			webGLProperty.uniformLocations.projectionMatrixLocation,
+			false,
+			this._projectionMatrix.extract()
+		);
 
 		gl.drawElements(
 			gl.TRIANGLES,
-			this._sphiricalObject0.attributes.index.numItems,
+			this._sphereMesh0.attributes.index.numItems,
 			gl.UNSIGNED_SHORT,
 			0
 		);
@@ -292,7 +314,7 @@ function createShaderProgram( gl: WebGLRenderingContext ): WebGLProgram {
 
 }
 
-function uploadObject( gl: WebGLRenderingContext, shaderProgram: WebGLProgram, object: SphiricalObject ): WebGLProperty {
+function uploadObject( gl: WebGLRenderingContext, shaderProgram: WebGLProgram, object: SphereMesh ): WebGLProperty {
 
 	const webGLProperty = {
 		attributeBuffers: {
@@ -310,6 +332,7 @@ function uploadObject( gl: WebGLRenderingContext, shaderProgram: WebGLProgram, o
 		uniformLocations: {
 			projectionMatrixLocation: gl.getUniformLocation( shaderProgram, 'uProjectionMatrix' ),
 			viewMatrixLocation: gl.getUniformLocation( shaderProgram, 'uViewMatrix' ),
+			modelMatrixLocation: gl.getUniformLocation( shaderProgram, 'uModelMatrix' ),
 			textureLocation: gl.getUniformLocation( shaderProgram, 'uSampler' ),
 		}
 	};
