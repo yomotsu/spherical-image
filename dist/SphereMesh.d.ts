@@ -5,7 +5,7 @@ export declare type BaseTexture = HTMLImageElement | HTMLCanvasElement | HTMLVid
 export declare class SphereMesh extends EventDispatcher {
     private _baseTexture;
     private _modelMatrix;
-    constructor(textureSource: TextureSource, initialRotationPhi: number, initialRotationTheta: number);
+    constructor(textureSource: TextureSource, defaultRotationPhi: number, defaultRotationTheta: number);
     readonly attributes: {
         index: {
             array: Uint16Array;
