@@ -1,87 +1,45 @@
+import { WebGLProperty } from './types';
 import { Matrix4 } from './Matrix4';
-import { SphereMesh, TextureSource, BaseTexture } from './SphereMesh';
-
-interface WebGLProperty {
-	attributeBuffers: {
-		indexBuffer: WebGLBuffer | null,
-		positionBuffer: WebGLBuffer | null,
-		textureCoordBuffer: WebGLBuffer | null,
-	},
-	attributeLocations: {
-		positionLocation: number,
-		textureCoordLocation: number,
-	},
-	uniformValues: {
-		textureValue: WebGLTexture | null,
-	},
-	uniformLocations: {
-		projectionMatrixLocation: WebGLUniformLocation | null,
-		viewMatrixLocation: WebGLUniformLocation | null,
-		modelMatrixLocation: WebGLUniformLocation | null,
-		textureLocation: WebGLUniformLocation | null,
-	}
-}
+import { SphereMesh, TextureSource } from './SphereMesh';
+import { createVertexShader, createFragmentShader, createShaderProgram, uploadObject } from './webglUtils';
 
 interface Options {
-	initialRotationPhi: number;
-	initialRotationTheta: number;
+	defaultRotationPhi?: number;
+	defaultRotationTheta?: number;
 }
 
 const DEG2RAD = Math.PI / 180;
 const PI_HALF = Math.PI * 0.5;
+const PI_2 = Math.PI * 2;
 const CAMERA_FOV = 45; // in deg
 const CAMERA_NEAR = 0.1;
 const CAMERA_FAR = 100;
-
-const VERTEX_SHADER_SOURCE = `
-attribute vec3 aVertexPosition;
-attribute vec2 aTextureCoord;
-
-uniform mat4 uProjectionMatrix;
-uniform mat4 uViewMatrix;
-uniform mat4 uModelMatrix;
-
-varying vec2 vTextureCoord;
-
-void main(void) {
-	gl_Position = uProjectionMatrix * uModelMatrix * uViewMatrix * vec4( aVertexPosition, 1.0 );
-	vTextureCoord = aTextureCoord;
-}
-`;
-
-const FRAGMENT_SHADER_SOURCE = `
-precision mediump float;
-
-varying vec2 vTextureCoord;
-uniform sampler2D uSampler;
-
-void main( void ) {
-	vec4 textureColor = texture2D( uSampler, vTextureCoord );
-	gl_FragColor = vec4( textureColor.rgb, 1.0 );
-}
-`;
 
 export class SphericalImage {
 
 	private _canvas: HTMLCanvasElement;
 	private _width: number;
 	private _height: number;
-	private _willRender: boolean;
+	private _willRender: boolean = true;
 	private _gl: WebGLRenderingContext;
+	private _vertexShader: WebGLShader;
+	private _fragmentShader: WebGLShader;
 	private _shaderProgram: WebGLProgram;
 	private _projectionMatrix: Matrix4;
-	private _viewMatrix: Matrix4;
-	private _cameraRotation: [ number, number, number ];
-	private _webGLProperties: WeakMap<SphereMesh, WebGLProperty>;
+	private _viewMatrix: Matrix4 = new Matrix4();
+	private _cameraRotation: Float32Array = new Float32Array( [ 0, 0, 0 ] );
+	private _cameraRotationTo: Float32Array = new Float32Array( [ 0, 0, 0 ] );
+	private _webGLProperties: WeakMap<SphereMesh, WebGLProperty> = new WeakMap();
 	private _sphereMesh0: SphereMesh;
+	private _destoried: boolean = false;
+
+	public dampingFactor: number = 0.1;
+	public destory: () => void;
 
 	constructor(
 		canvas: HTMLCanvasElement,
 		textureSource: TextureSource,
-		options: Options = {
-			initialRotationPhi: 0,
-			initialRotationTheta: 0,
-		},
+		options: Options = {},
 	) {
 
 		const scope = this;
@@ -89,44 +47,51 @@ export class SphericalImage {
 		this._canvas = canvas;
 		this._width = canvas.width;
 		this._height = canvas.height;
-		this._willRender = true;
 
-		this._gl = canvas.getContext( 'experimental-webgl' )!;
+		this._gl = getWebglContext( canvas );
 		this._gl.viewport( 0, 0, this._width, this._height );
 		this._gl.clearColor( 0, 0, 0, 1 );
 		this._gl.enable( this._gl.DEPTH_TEST );
 
-		this._shaderProgram = createShaderProgram( this._gl );
+		this._vertexShader = createVertexShader( this._gl );
+		this._fragmentShader = createFragmentShader( this._gl );
+		this._shaderProgram = createShaderProgram(
+			this._gl,
+			this._vertexShader,
+			this._fragmentShader
+		);
 
 		this._projectionMatrix = new Matrix4();
 		this._projectionMatrix.perspective( CAMERA_FOV, this._width / this._height, CAMERA_NEAR, CAMERA_FAR );
 
-		this._viewMatrix = new Matrix4();
-
-		this._cameraRotation = [ 0, 0, 0 ];
-		this._webGLProperties = new WeakMap();
-
 		this._sphereMesh0 = new SphereMesh(
 			textureSource,
-			options.initialRotationPhi,
-			options.initialRotationTheta,
+			options.defaultRotationPhi || 0,
+			options.defaultRotationTheta || 0,
 		);
 		this._webGLProperties.set(
 			this._sphereMesh0,
 			uploadObject( this._gl, this._shaderProgram, this._sphereMesh0 )
 		);
 
-		this._willRender = true;
 		this._sphereMesh0.addEventListener( 'textureUpdated', () => this._willRender = true );
 
-		// ( function tick( elapsed: number ) {
-		( function tick() {
+		let lastElapsedTime: number = 0;
+		let requestAnimationFrameId: number = 0;
+
+		( function tick( elapsed: number ) {
 
 			// if ( elapsed > 10000 ) return;
-			requestAnimationFrame( tick );
-			scope._render();
+			if ( scope._destoried ) return;
 
-		} )();
+			requestAnimationFrameId = requestAnimationFrame( tick );
+
+			const delta = elapsed - lastElapsedTime;
+			updateCameraRotation( delta );
+			scope._render();
+			lastElapsedTime = elapsed;
+
+		} )( 0 );
 
 
 		// mouse events
@@ -178,9 +143,8 @@ export class SphericalImage {
 			const deltaX = _event.pageX - lastDragX;
 			const deltaY = _event.pageY - lastDragY;
 
-			scope._cameraRotation[ 0 ] += ( deltaY * - 0.1 ) * DEG2RAD;
-			scope._cameraRotation[ 1 ] += ( deltaX * - 0.1 ) * DEG2RAD;
-			scope._willRender = true;
+			scope._cameraRotationTo[ 0 ] += ( deltaY * - 0.1 ) * DEG2RAD;
+			scope._cameraRotationTo[ 1 ] += ( deltaX * - 0.1 ) * DEG2RAD;
 
 			lastDragX = _event.pageX;
 			lastDragY = _event.pageY;
@@ -196,13 +160,70 @@ export class SphericalImage {
 
 		}
 
+		function updateCameraRotation( delta: number ): void {
+
+			const lerpRatio = 1 - Math.exp( - scope.dampingFactor * delta / 16 );
+
+			const deltaX = scope._cameraRotationTo[ 0 ] - scope._cameraRotation[ 0 ];
+			const deltaY = scope._cameraRotationTo[ 1 ] - scope._cameraRotation[ 1 ];
+
+			if ( Math.abs( deltaX ) > 1e-5 || Math.abs( deltaY ) > 1e-5 ) {
+
+				scope._cameraRotation[ 0 ] += deltaX * lerpRatio;
+				scope._cameraRotation[ 1 ] += deltaY * lerpRatio;
+				scope._willRender = true;
+
+			}
+
+		}
+
+		this.destory = (): void => {
+
+			this._destoried = true;
+			this._willRender = false;
+			cancelAnimationFrame( requestAnimationFrameId );
+
+			this._gl.activeTexture( this._gl.TEXTURE0 );
+			this._gl.bindTexture( this._gl.TEXTURE_2D, null );
+			// this._gl.activeTexture( this._gl.TEXTURE1 );
+			// this._gl.bindTexture( this._gl.TEXTURE_2D, null );
+			this._gl.bindBuffer( this._gl.ARRAY_BUFFER, null );
+			this._gl.bindBuffer( this._gl.ELEMENT_ARRAY_BUFFER, null );
+			this._gl.bindRenderbuffer( this._gl.RENDERBUFFER, null );
+			this._gl.bindFramebuffer( this._gl.FRAMEBUFFER, null );
+
+			const webGLProperty = this._webGLProperties.get( this._sphereMesh0 )!;
+			this._gl.deleteBuffer( webGLProperty.attributeBuffers.indexBuffer );
+			this._gl.deleteBuffer( webGLProperty.attributeBuffers.positionBuffer );
+			this._gl.deleteBuffer( webGLProperty.attributeBuffers.textureCoordBuffer );
+			this._gl.deleteTexture( webGLProperty.uniformValues.textureValue );
+
+			this._gl.deleteShader( this._vertexShader );
+			this._gl.deleteShader( this._fragmentShader );
+			this._gl.deleteProgram( this._shaderProgram );
+
+			// const extension = this._gl.getExtension( 'WEBGL_lose_context' );
+			// if ( extension ) extension.loseContext();
+
+			this._canvas.removeEventListener( 'mousedown', onMouseDown );
+			this._canvas.removeEventListener( 'touchstart', onTouchStart );
+			this._canvas.removeEventListener( 'contextmenu', onContextMenu );
+
+			document.removeEventListener( 'mousemove', dragging );
+			document.removeEventListener( 'touchmove', dragging );
+			document.removeEventListener( 'mouseup',  endDragging );
+			document.removeEventListener( 'touchend', endDragging );
+
+		}
+
 	}
 
 	public setSize( width: number, height: number ): void {
 
 		this._width = width;
 		this._height = height;
-
+		this._canvas.width = this._width;
+		this._canvas.height = this._height;
 		this._gl.viewport( 0, 0, this._width, this._height );
 		this._projectionMatrix.perspective( CAMERA_FOV, this._width / this._height, CAMERA_NEAR, CAMERA_FAR );
 		this._willRender = true;
@@ -217,12 +238,8 @@ export class SphericalImage {
 
 		gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
 
-		this._cameraRotation[ 0 ] = Math.min(
-			this._cameraRotation[ 0 ], PI_HALF - 1e-10
-		);
-		this._cameraRotation[ 0 ] = Math.max(
-			this._cameraRotation[ 0 ], - PI_HALF + 1e-10
-		);
+		this._cameraRotationTo[ 0 ] = Math.min( this._cameraRotationTo[ 0 ],   PI_HALF - 1e-10 );
+		this._cameraRotationTo[ 0 ] = Math.max( this._cameraRotationTo[ 0 ], - PI_HALF + 1e-10 );
 
 		this._viewMatrix.makeRotationFromEulerXYZ(
 			this._cameraRotation[ 0 ],
@@ -291,96 +308,33 @@ export class SphericalImage {
 
 	}
 
-}
+	public reset(): void {
 
-function createShaderProgram( gl: WebGLRenderingContext ): WebGLProgram {
+		this._cameraRotation[ 0 ] = this._cameraRotation[ 0 ] % PI_2;
+		this._cameraRotation[ 1 ] = this._cameraRotation[ 1 ] % PI_2;
+		this._cameraRotationTo[ 0 ] = 0;
+		this._cameraRotationTo[ 1 ] = 0;
 
-	const vertexShader = gl.createShader( gl.VERTEX_SHADER )!;
-	gl.shaderSource( vertexShader, VERTEX_SHADER_SOURCE );
-	gl.compileShader( vertexShader );
-
-	const fragmentShader = gl.createShader( gl.FRAGMENT_SHADER )!;
-	gl.shaderSource( fragmentShader, FRAGMENT_SHADER_SOURCE );
-	gl.compileShader( fragmentShader );
-
-	const shaderProgram = gl.createProgram()!;
-	gl.attachShader( shaderProgram, vertexShader );
-	gl.attachShader( shaderProgram, fragmentShader );
-	gl.linkProgram( shaderProgram );
-
-	gl.useProgram( shaderProgram );
-
-	return shaderProgram;
+	}
 
 }
 
-function uploadObject( gl: WebGLRenderingContext, shaderProgram: WebGLProgram, object: SphereMesh ): WebGLProperty {
+function getWebglContext( canvas: HTMLCanvasElement ): WebGLRenderingContext {
 
-	const webGLProperty = {
-		attributeBuffers: {
-			indexBuffer: gl.createBuffer(),
-			positionBuffer: gl.createBuffer(),
-			textureCoordBuffer: gl.createBuffer(),
-		},
-		attributeLocations: {
-			positionLocation: gl.getAttribLocation( shaderProgram, 'aVertexPosition' ),
-			textureCoordLocation: gl.getAttribLocation( shaderProgram, 'aTextureCoord' ),
-		},
-		uniformValues: {
-			textureValue: gl.createTexture()!,
-		},
-		uniformLocations: {
-			projectionMatrixLocation: gl.getUniformLocation( shaderProgram, 'uProjectionMatrix' ),
-			viewMatrixLocation: gl.getUniformLocation( shaderProgram, 'uViewMatrix' ),
-			modelMatrixLocation: gl.getUniformLocation( shaderProgram, 'uModelMatrix' ),
-			textureLocation: gl.getUniformLocation( shaderProgram, 'uSampler' ),
-		}
+	const contextAttributes = {
+		alpha: false,
+		depth: false,
+		stencil: false,
+		antialias: false,
+		premultipliedAlpha: false,
+		preserveDrawingBuffer: false,
+		powerPreference: false,
 	};
 
-	// buffer
-	gl.bindBuffer( gl.ELEMENT_ARRAY_BUFFER, webGLProperty.attributeBuffers.indexBuffer );
-	gl.bufferData( gl.ELEMENT_ARRAY_BUFFER, object.attributes.index.array, gl.STATIC_DRAW );
-
-	gl.bindBuffer( gl.ARRAY_BUFFER, webGLProperty.attributeBuffers.textureCoordBuffer );
-	gl.bufferData( gl.ARRAY_BUFFER, object.attributes.textureCoord.array, gl.STATIC_DRAW );
-
-	gl.bindBuffer( gl.ARRAY_BUFFER, webGLProperty.attributeBuffers.positionBuffer );
-	gl.bufferData( gl.ARRAY_BUFFER, object.attributes.position.array, gl.STATIC_DRAW );
-
-	// enable attrs
-	gl.enableVertexAttribArray( webGLProperty.attributeLocations.positionLocation );
-	gl.enableVertexAttribArray( webGLProperty.attributeLocations.textureCoordLocation );
-
-	uploadTexture( gl, object.baseTexture, webGLProperty.uniformValues.textureValue );
-
-	// texture upload
-	object.addEventListener( 'textureUpdated', () => {
-
-		uploadTexture( gl, object.baseTexture, webGLProperty.uniformValues.textureValue );
-
-	} );
-
-	return webGLProperty;
-
-}
-
-function uploadTexture( gl: WebGLRenderingContext, baseTexture: BaseTexture, webglTexture: WebGLTexture ): void {
-
-	gl.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, + true );
-	gl.bindTexture( gl.TEXTURE_2D, webglTexture );
-	gl.texImage2D(
-		gl.TEXTURE_2D,
-		0,
-		gl.RGB,
-		gl.RGB,
-		gl.UNSIGNED_BYTE,
-		baseTexture,
-	);
-	gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR );
-	gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST );
-	gl.generateMipmap( gl.TEXTURE_2D );
-
-	gl.bindTexture( gl.TEXTURE_2D, null );
+	return (
+		canvas.getContext( 'webgl', contextAttributes ) ||
+		canvas.getContext( 'experimental-webgl', contextAttributes )
+	) as WebGLRenderingContext;
 
 }
 

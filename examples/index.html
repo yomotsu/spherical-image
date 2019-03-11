@@ -7,22 +7,13 @@
 </head>
 <body>
 
-Drag to rotate<br>
-<canvas id="canvas0" width="800" height="600"></canvas>
-<canvas id="canvas1" width="300" height="600"></canvas>
+Drag to rotate | <button type="button" onclick="sphericalImage.reset();">reset</button><br>
+<canvas id="mycanvas" width="800" height="600"></canvas>
 
 <script src="../dist/spherical-image.js"></script>
 <script>
-const sphericalImage0 = new SphericalImage( document.getElementById( 'canvas0' ), './img.jpg' );
+const sphericalImage = new SphericalImage( document.getElementById( 'mycanvas' ), './img.jpg' );
 
-const sphericalImage1 = new SphericalImage(
-  document.getElementById( 'canvas1' ),
-  './img.jpg',
-  {
-    initialRotationPhi: Math.PI,
-    initialRotationTheta: Math.PI,
-  }
-);
 </script>
 
 </body>

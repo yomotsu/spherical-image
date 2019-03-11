@@ -1,3 +1,4 @@
+import { webglStats } from 'webglStats';
 import { EventDispatcher } from './EventDispatcher';
 import { Matrix4 } from 'Matrix4';
 export type TextureSource = string | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
@@ -100,8 +101,8 @@ export class SphereMesh extends EventDispatcher {
 
 	constructor(
 		textureSource: TextureSource,
-		initialRotationPhi: number,
-		initialRotationTheta: number,
+		defaultRotationPhi: number,
+		defaultRotationTheta: number,
 	) {
 
 		super();
@@ -109,13 +110,13 @@ export class SphereMesh extends EventDispatcher {
 		this._baseTexture = EMPTY_TEXTURE;
 		this._modelMatrix = new Matrix4;
 		this._modelMatrix.makeRotationFromEulerXYZ(
-			initialRotationPhi,
-			initialRotationTheta,
+			defaultRotationPhi,
+			defaultRotationTheta,
 			0,
 		);
 
-		Object.defineProperty( this, 'initialRotationPhi',   { value: initialRotationPhi } );
-		Object.defineProperty( this, 'initialRotationTheta', { value: initialRotationTheta } );
+		Object.defineProperty( this, 'defaultRotationPhi',   { value: defaultRotationPhi } );
+		Object.defineProperty( this, 'defaultRotationTheta', { value: defaultRotationTheta } );
 
 		this.updateTexture( textureSource );
 
@@ -140,11 +141,9 @@ export class SphereMesh extends EventDispatcher {
 	}
 
 	public rotate( phi: number, theta: number ): void {
-		this._modelMatrix.makeRotationFromEulerXYZ(
-			phi,
-			theta,
-			0,
-		);
+
+		this._modelMatrix.makeRotationFromEulerXYZ( phi, theta, 0 );
+
 	}
 
 	public updateTexture( textureSource: TextureSource ): void {
@@ -154,7 +153,7 @@ export class SphereMesh extends EventDispatcher {
 			const image = new Image();
 			const onload = () => {
 
-				this._baseTexture = image;
+				this._baseTexture = isPowerOfTwoImage( image ) ? image : resizeImage( image );
 				this.dispatchEvent( { type: 'textureUpdated' } );
 				image.removeEventListener( 'load', onload );
 
@@ -164,11 +163,43 @@ export class SphereMesh extends EventDispatcher {
 
 		} else if ( textureSource instanceof HTMLCanvasElement ) {
 
-			this._baseTexture = textureSource;
+			this._baseTexture = isPowerOfTwoImage( textureSource ) ? textureSource : resizeImage( textureSource );
 			this.dispatchEvent( { type: 'textureUpdated' } );
 
 		}
 
 	}
+
+}
+
+function resizeImage ( image: HTMLImageElement | HTMLCanvasElement ): HTMLCanvasElement {
+
+	const width = Math.min( ceilPowerOfTwo( image.width ), webglStats.maxTextureSize );
+	const height = Math.min( ceilPowerOfTwo( image.height ), webglStats.maxTextureSize );
+	const canvas = document.createElement( 'canvas' );
+	const context = canvas.getContext( '2d' )!;
+	canvas.width = width;
+	canvas.height = height;
+	context.drawImage( image, 0, 0, width, height );
+
+	return canvas;
+
+}
+
+function isPowerOfTwoImage ( image: HTMLImageElement | HTMLCanvasElement ): boolean {
+
+	return isPowerOfTwo( image.width ) && isPowerOfTwo( image.height );
+
+}
+
+function isPowerOfTwo ( value: number ): boolean {
+
+	return ( value & ( value - 1 ) ) === 0 && value !== 0;
+
+}
+
+function ceilPowerOfTwo ( value: number ): number {
+
+	return Math.pow( 2, Math.ceil( Math.log( value ) / Math.LN2 ) );
 
 }
