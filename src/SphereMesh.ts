@@ -1,6 +1,6 @@
 import { webglStats } from 'webglStats';
 import { EventDispatcher } from './EventDispatcher';
-import { Matrix4 } from 'Matrix4';
+import { Matrix4 } from './Math/Matrix4';
 export type TextureSource = string | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
 export type BaseTexture = HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
 

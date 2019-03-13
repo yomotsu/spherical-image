@@ -18,4 +18,3 @@ if ( gl ) {
 	if ( extension ) extension.loseContext();
 
 }
-

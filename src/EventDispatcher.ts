@@ -52,18 +52,18 @@ export class EventDispatcher {
 	// 	}
 	// }
 
-	// public removeAllEventListeners( type?: string ): void {
+	public removeAllEventListeners( type?: string ): void {
 
-	// 	if ( ! type ) {
+		if ( ! type ) {
 
-	// 		this._listeners = {};
-	// 		return;
+			this._listeners = {};
+			return;
 
-	// 	}
+		}
 
-	// 	if ( Array.isArray( this._listeners[ type ] ) ) this._listeners[ type ].length = 0;
+		if ( Array.isArray( this._listeners[ type ] ) ) this._listeners[ type ].length = 0;
 
-	// }
+	}
 
 	public dispatchEvent(event: DispatcherEvent): void {
 

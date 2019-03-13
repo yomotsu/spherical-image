@@ -1,7 +1,17 @@
 import { WebGLProperty } from './types';
-import { Matrix4 } from './Matrix4';
+import { Matrix4 } from './Math/Matrix4';
+import { DeviceOrientation } from './DeviceOrientation';
 import { SphereMesh, TextureSource } from './SphereMesh';
-import { createVertexShader, createFragmentShader, createShaderProgram, uploadObject } from './webglUtils';
+import {
+	getWebglContext,
+	createVertexShader,
+	createFragmentShader,
+	createShaderProgram,
+	uploadObject,
+} from './webglUtils';
+
+const mat4a = new Matrix4();
+const mat4b = new Matrix4();
 
 interface Options {
 	defaultRotationPhi?: number;
@@ -32,6 +42,7 @@ export class SphericalImage {
 	private _webGLProperties: WeakMap<SphereMesh, WebGLProperty> = new WeakMap();
 	private _sphereMesh0: SphereMesh;
 	private _destoried: boolean = false;
+	private _deviceOrientation: DeviceOrientation = new DeviceOrientation();
 
 	public dampingFactor: number = 0.1;
 	public destory: () => void;
@@ -48,7 +59,17 @@ export class SphericalImage {
 		this._width = canvas.width;
 		this._height = canvas.height;
 
-		this._gl = getWebglContext( canvas );
+		const contextAttributes = {
+			alpha: false,
+			depth: false,
+			stencil: false,
+			antialias: false,
+			premultipliedAlpha: false,
+			preserveDrawingBuffer: false,
+			powerPreference: false,
+		};
+
+		this._gl = getWebglContext( canvas, contextAttributes );
 		this._gl.viewport( 0, 0, this._width, this._height );
 		this._gl.clearColor( 0, 0, 0, 1 );
 		this._gl.enable( this._gl.DEPTH_TEST );
@@ -177,6 +198,13 @@ export class SphericalImage {
 
 		}
 
+		//
+		this._deviceOrientation.addEventListener( 'updated', () => {
+			this._willRender = true;
+		} );
+
+
+		//
 		this.destory = (): void => {
 
 			this._destoried = true;
@@ -214,6 +242,9 @@ export class SphericalImage {
 			document.removeEventListener( 'mouseup',  endDragging );
 			document.removeEventListener( 'touchend', endDragging );
 
+			this._deviceOrientation.removeAllEventListeners();
+			this._deviceOrientation.destroy();
+
 		}
 
 	}
@@ -241,11 +272,9 @@ export class SphericalImage {
 		this._cameraRotationTo[ 0 ] = Math.min( this._cameraRotationTo[ 0 ],   PI_HALF - 1e-10 );
 		this._cameraRotationTo[ 0 ] = Math.max( this._cameraRotationTo[ 0 ], - PI_HALF + 1e-10 );
 
-		this._viewMatrix.makeRotationFromEulerXYZ(
-			this._cameraRotation[ 0 ],
-			this._cameraRotation[ 1 ],
-			0
-		);
+		mat4a.makeRotationFromEulerXYZ( this._cameraRotation[ 0 ], this._cameraRotation[ 1 ], 0 );
+		mat4b.makeRotationFromQuaternion( this._deviceOrientation.quaternion );
+		this._viewMatrix.multiplyMatrices( mat4a, mat4b );
 
 		this._renderObject( this._sphereMesh0 );
 		this._willRender = false;
@@ -317,24 +346,12 @@ export class SphericalImage {
 
 	}
 
-}
+	public calibrate() : void {
 
-function getWebglContext( canvas: HTMLCanvasElement ): WebGLRenderingContext {
+		this._deviceOrientation.calibrate();
+		this._willRender = true;
 
-	const contextAttributes = {
-		alpha: false,
-		depth: false,
-		stencil: false,
-		antialias: false,
-		premultipliedAlpha: false,
-		preserveDrawingBuffer: false,
-		powerPreference: false,
-	};
-
-	return (
-		canvas.getContext( 'webgl', contextAttributes ) ||
-		canvas.getContext( 'experimental-webgl', contextAttributes )
-	) as WebGLRenderingContext;
+	}
 
 }
 

@@ -1,6 +1,25 @@
 import { WebGLProperty } from './types';
 import { SphereMesh, BaseTexture } from './SphereMesh';
 
+interface ContextAttributes {
+	alpha?: boolean,
+	depth?: boolean,
+	stencil?: boolean,
+	antialias?: boolean,
+	premultipliedAlpha?: boolean,
+	preserveDrawingBuffer?: boolean,
+	powerPreference?: boolean,
+};
+
+export function getWebglContext( canvas: HTMLCanvasElement, contextAttributes: ContextAttributes ): WebGLRenderingContext {
+
+	return (
+		canvas.getContext( 'webgl', contextAttributes ) ||
+		canvas.getContext( 'experimental-webgl', contextAttributes )
+	) as WebGLRenderingContext;
+
+}
+
 const VERTEX_SHADER_SOURCE = `
 attribute vec3 aVertexPosition;
 attribute vec2 aTextureCoord;
