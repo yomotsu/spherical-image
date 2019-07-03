@@ -9,5 +9,6 @@ export declare class EventDispatcher {
     };
     constructor();
     addEventListener(type: string, listener: Listener): void;
+    removeAllEventListeners(type?: string): void;
     dispatchEvent(event: DispatcherEvent): void;
 }

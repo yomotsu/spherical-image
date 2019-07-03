@@ -1,9 +1,11 @@
 import { TextureSource } from './SphereMesh';
 interface Options {
-    defaultRotationPhi?: number;
-    defaultRotationTheta?: number;
+    offsetAzimuth?: number;
+    offsetAltitude?: number;
 }
 export declare class SphericalImage {
+    dampingFactor: number;
+    destroy: () => void;
     private _canvas;
     private _width;
     private _height;
@@ -18,13 +20,13 @@ export declare class SphericalImage {
     private _cameraRotationTo;
     private _webGLProperties;
     private _sphereMesh0;
-    private _destoried;
-    dampingFactor: number;
-    destory: () => void;
+    private _destroyed;
+    private _deviceOrientation;
     constructor(canvas: HTMLCanvasElement, textureSource: TextureSource, options?: Options);
     setSize(width: number, height: number): void;
+    reset(): void;
+    calibrate(): void;
     private _render;
     private _renderObject;
-    reset(): void;
 }
 export {};
