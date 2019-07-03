@@ -1,3 +1,5 @@
+import { Vector3 } from './Vector3';
+
 export class Quaternion {
 
 	private _array: Float32Array;
@@ -96,7 +98,7 @@ export class Quaternion {
 
 	}
 
-	public setFromAxisAngle( axisX: number, axisY: number, axisZ: number, angle: number ): this {
+	public setFromAxisAngle( axis: Vector3, angle: number ): this {
 
 		// http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToQuaternion/index.htm
 
@@ -105,9 +107,9 @@ export class Quaternion {
 		const halfAngle = angle / 2;
 		const s = Math.sin( halfAngle );
 
-		this._array[ 0 ] = axisX * s;
-		this._array[ 1 ] = axisY * s;
-		this._array[ 2 ] = axisZ * s;
+		this._array[ 0 ] = axis.x * s;
+		this._array[ 1 ] = axis.y * s;
+		this._array[ 2 ] = axis.z * s;
 		this._array[ 3 ] = Math.cos( halfAngle );
 
 		return this;

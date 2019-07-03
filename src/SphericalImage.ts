@@ -1,4 +1,5 @@
 import { WebGLProperty } from './types';
+import { DEG2RAD, PI_HALF, PI_2 } from './Math/constants';
 import { Matrix4 } from './Math/Matrix4';
 import { DeviceOrientation } from './DeviceOrientation';
 import { SphereMesh, TextureSource } from './SphereMesh';
@@ -14,18 +15,18 @@ const mat4a = new Matrix4();
 const mat4b = new Matrix4();
 
 interface Options {
-	defaultRotationPhi?: number;
-	defaultRotationTheta?: number;
+	offsetAzimuth?: number;
+	offsetAltitude?: number;
 }
 
-const DEG2RAD = Math.PI / 180;
-const PI_HALF = Math.PI * 0.5;
-const PI_2 = Math.PI * 2;
 const CAMERA_FOV = 45; // in deg
 const CAMERA_NEAR = 0.1;
 const CAMERA_FAR = 100;
 
 export class SphericalImage {
+
+	public dampingFactor: number = 0.1;
+	public destroy: () => void;
 
 	private _canvas: HTMLCanvasElement;
 	private _width: number;
@@ -41,11 +42,8 @@ export class SphericalImage {
 	private _cameraRotationTo: Float32Array = new Float32Array( [ 0, 0, 0 ] );
 	private _webGLProperties: WeakMap<SphereMesh, WebGLProperty> = new WeakMap();
 	private _sphereMesh0: SphereMesh;
-	private _destoried: boolean = false;
+	private _destroyed: boolean = false;
 	private _deviceOrientation: DeviceOrientation = new DeviceOrientation();
-
-	public dampingFactor: number = 0.1;
-	public destory: () => void;
 
 	constructor(
 		canvas: HTMLCanvasElement,
@@ -66,7 +64,7 @@ export class SphericalImage {
 			antialias: false,
 			premultipliedAlpha: false,
 			preserveDrawingBuffer: false,
-			powerPreference: false,
+			// powerPreference: 'default', // TypeScript doesn't allow to set string
 		};
 
 		this._gl = getWebglContext( canvas, contextAttributes );
@@ -79,7 +77,7 @@ export class SphericalImage {
 		this._shaderProgram = createShaderProgram(
 			this._gl,
 			this._vertexShader,
-			this._fragmentShader
+			this._fragmentShader,
 		);
 
 		this._projectionMatrix = new Matrix4();
@@ -87,8 +85,8 @@ export class SphericalImage {
 
 		this._sphereMesh0 = new SphereMesh(
 			textureSource,
-			options.defaultRotationPhi || 0,
-			options.defaultRotationTheta || 0,
+			options.offsetAzimuth || 0,
+			options.offsetAltitude || 0,
 		);
 		this._webGLProperties.set(
 			this._sphereMesh0,
@@ -103,7 +101,7 @@ export class SphericalImage {
 		( function tick( elapsed: number ) {
 
 			// if ( elapsed > 10000 ) return;
-			if ( scope._destoried ) return;
+			if ( scope._destroyed ) return;
 
 			requestAnimationFrameId = requestAnimationFrame( tick );
 
@@ -164,8 +162,8 @@ export class SphericalImage {
 			const deltaX = _event.pageX - lastDragX;
 			const deltaY = _event.pageY - lastDragY;
 
-			scope._cameraRotationTo[ 0 ] += ( deltaY * - 0.1 ) * DEG2RAD;
-			scope._cameraRotationTo[ 1 ] += ( deltaX * - 0.1 ) * DEG2RAD;
+			scope._cameraRotationTo[ 0 ] += ( deltaY * - 0.2 ) * DEG2RAD;
+			scope._cameraRotationTo[ 1 ] += ( deltaX * - 0.2 ) * DEG2RAD;
 
 			lastDragX = _event.pageX;
 			lastDragY = _event.pageY;
@@ -183,7 +181,7 @@ export class SphericalImage {
 
 		function updateCameraRotation( delta: number ): void {
 
-			const lerpRatio = 1 - Math.exp( - scope.dampingFactor * delta / 16 );
+			const lerpRatio = 1 - Math.exp( - scope.dampingFactor * delta / 8 );
 
 			const deltaX = scope._cameraRotationTo[ 0 ] - scope._cameraRotation[ 0 ];
 			const deltaY = scope._cameraRotationTo[ 1 ] - scope._cameraRotation[ 1 ];
@@ -205,9 +203,9 @@ export class SphericalImage {
 
 
 		//
-		this.destory = (): void => {
+		this.destroy = (): void => {
 
-			this._destoried = true;
+			this._destroyed = true;
 			this._willRender = false;
 			cancelAnimationFrame( requestAnimationFrameId );
 
@@ -257,6 +255,22 @@ export class SphericalImage {
 		this._canvas.height = this._height;
 		this._gl.viewport( 0, 0, this._width, this._height );
 		this._projectionMatrix.perspective( CAMERA_FOV, this._width / this._height, CAMERA_NEAR, CAMERA_FAR );
+		this._willRender = true;
+
+	}
+
+	public reset(): void {
+
+		this._cameraRotation[ 0 ] = this._cameraRotation[ 0 ] % PI_2;
+		this._cameraRotation[ 1 ] = this._cameraRotation[ 1 ] % PI_2;
+		this._cameraRotationTo[ 0 ] = 0;
+		this._cameraRotationTo[ 1 ] = 0;
+
+	}
+
+	public calibrate() : void {
+
+		this._deviceOrientation.calibrate();
 		this._willRender = true;
 
 	}
@@ -334,22 +348,6 @@ export class SphericalImage {
 			gl.UNSIGNED_SHORT,
 			0
 		);
-
-	}
-
-	public reset(): void {
-
-		this._cameraRotation[ 0 ] = this._cameraRotation[ 0 ] % PI_2;
-		this._cameraRotation[ 1 ] = this._cameraRotation[ 1 ] % PI_2;
-		this._cameraRotationTo[ 0 ] = 0;
-		this._cameraRotationTo[ 1 ] = 0;
-
-	}
-
-	public calibrate() : void {
-
-		this._deviceOrientation.calibrate();
-		this._willRender = true;
 
 	}
 

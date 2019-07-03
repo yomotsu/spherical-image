@@ -2,16 +2,19 @@ import { WebGLProperty } from './types';
 import { SphereMesh, BaseTexture } from './SphereMesh';
 
 interface ContextAttributes {
-	alpha?: boolean,
-	depth?: boolean,
-	stencil?: boolean,
-	antialias?: boolean,
-	premultipliedAlpha?: boolean,
-	preserveDrawingBuffer?: boolean,
-	powerPreference?: boolean,
+	alpha?: boolean;
+	depth?: boolean;
+	stencil?: boolean;
+	antialias?: boolean;
+	premultipliedAlpha?: boolean;
+	preserveDrawingBuffer?: boolean;
+	powerPreference?: boolean;
 };
 
-export function getWebglContext( canvas: HTMLCanvasElement, contextAttributes: ContextAttributes ): WebGLRenderingContext {
+export function getWebglContext(
+	canvas: HTMLCanvasElement,
+	contextAttributes: ContextAttributes,
+): WebGLRenderingContext {
 
 	return (
 		canvas.getContext( 'webgl', contextAttributes ) ||
@@ -53,6 +56,7 @@ export function createVertexShader( gl: WebGLRenderingContext ): WebGLShader {
 	const vertexShader = gl.createShader( gl.VERTEX_SHADER )!;
 	gl.shaderSource( vertexShader, VERTEX_SHADER_SOURCE );
 	gl.compileShader( vertexShader );
+
 	return vertexShader;
 }
 
@@ -61,6 +65,7 @@ export function createFragmentShader( gl: WebGLRenderingContext ): WebGLShader {
 	const fragmentShader = gl.createShader( gl.FRAGMENT_SHADER )!;
 	gl.shaderSource( fragmentShader, FRAGMENT_SHADER_SOURCE );
 	gl.compileShader( fragmentShader );
+
 	return fragmentShader;
 
 }
@@ -68,7 +73,7 @@ export function createFragmentShader( gl: WebGLRenderingContext ): WebGLShader {
 export function createShaderProgram(
 	gl: WebGLRenderingContext,
 	vertexShader: WebGLShader,
-	fragmentShader: WebGLShader
+	fragmentShader: WebGLShader,
 ): WebGLProgram {
 
 	const shaderProgram = gl.createProgram()!;
@@ -82,7 +87,11 @@ export function createShaderProgram(
 
 }
 
-export function uploadObject( gl: WebGLRenderingContext, shaderProgram: WebGLProgram, object: SphereMesh ): WebGLProperty {
+export function uploadObject(
+	gl: WebGLRenderingContext,
+	shaderProgram: WebGLProgram,
+	object: SphereMesh,
+): WebGLProperty {
 
 	const webGLProperty = {
 		attributeBuffers: {

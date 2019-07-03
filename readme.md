@@ -54,12 +54,12 @@ const sphericalImage = new SphericalImage(
 );
 ```
 
-- `options.defaultRotationPhi`: default horizontal rotation in radian. default is `0`
-- `options.defaultRotationTheta`: default vertical rotation in radian. default is `0`
+- `options.offsetAzimuth`: default horizontal rotation in radian. default is `0`
+- `options.offsetAltitude`: default vertical rotation in radian. default is `0`
 
 
 ## Methods
 
 - `.reset()`: reset view rotation.
 - `.setSize( width, height )`: set canvas size.
-- `.destory()`: destory the instance. dispose WebGL. detach all events.
+- `.destroy()`: destroy the instance. dispose WebGL. detach all events.

@@ -96,28 +96,18 @@ const ATTRIBUTES = {
 
 export class SphereMesh extends EventDispatcher {
 
-	private _baseTexture: BaseTexture;
-	private _modelMatrix: Matrix4;
+	private _baseTexture: BaseTexture = EMPTY_TEXTURE;
+	private _modelMatrix: Matrix4 = new Matrix4();
 
 	constructor(
 		textureSource: TextureSource,
-		defaultRotationPhi: number,
-		defaultRotationTheta: number,
+		offsetPhi: number,
+		offsetTheta: number,
 	) {
 
 		super();
 
-		this._baseTexture = EMPTY_TEXTURE;
-		this._modelMatrix = new Matrix4;
-		this._modelMatrix.makeRotationFromEulerXYZ(
-			defaultRotationPhi,
-			defaultRotationTheta,
-			0,
-		);
-
-		Object.defineProperty( this, 'defaultRotationPhi',   { value: defaultRotationPhi } );
-		Object.defineProperty( this, 'defaultRotationTheta', { value: defaultRotationTheta } );
-
+		this.rotateTo( offsetPhi, offsetTheta );
 		this.updateTexture( textureSource );
 
 	}
@@ -140,7 +130,7 @@ export class SphereMesh extends EventDispatcher {
 
 	}
 
-	public rotate( phi: number, theta: number ): void {
+	public rotateTo( phi: number = 0, theta: number = 0 ): void {
 
 		this._modelMatrix.makeRotationFromEulerXYZ( phi, theta, 0 );
 

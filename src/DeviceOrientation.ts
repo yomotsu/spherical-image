@@ -1,13 +1,20 @@
 import { EventDispatcher } from './EventDispatcher';
+import { DEG2RAD } from './Math/constants';
+import { Vector3 } from 'math/Vector3';
 import { Quaternion } from './Math/Quaternion';
 
-const DEG2RAD = Math.PI / 180;
 const ROTATION_ORDER = 'YXZ'; // 'ZXY' for the device, but 'YXZ' for us
-var Z_AXIS = [ 0, 0, 1 ];
-var q0 = new Quaternion();
-var q1 = new Quaternion( - Math.sqrt( 0.5 ), 0, 0, Math.sqrt( 0.5 ) ); // - PI/2 around the x-axis
+const Z_AXIS = new Vector3( 0, 0, 1 );
+const q0 = new Quaternion();
+const q1 = new Quaternion( - Math.sqrt( 0.5 ), 0, 0, Math.sqrt( 0.5 ) ); // - PI/2 around the x-axis
 
 export class DeviceOrientation extends EventDispatcher {
+
+	public offsetAlpha: number = 0; // radians
+	public offsetBeta : number = 0; // radians
+	public offsetGamma: number = 0; // radians
+	// public offsetScreenOrientation: number = 0; // radians
+	public destroy: () => void;
 
 	private _quaternion: Quaternion = new Quaternion();
 	private _deviceOrientation: {
@@ -20,12 +27,6 @@ export class DeviceOrientation extends EventDispatcher {
 		gamma: 0,
 	};
 	private _screenOrientation: number = 0;
-	
-	public alphaOffset: number = 0; // radians
-	public betaOffset : number = 0; // radians
-	public gammaOffset: number = 0; // radians
-	// public screenOrientationOffset: number = 0; // radians
-	public destroy: () => void;
 	
 	constructor() {
 
@@ -50,15 +51,15 @@ export class DeviceOrientation extends EventDispatcher {
 
 		const update = () => {
 
-			const alpha = this._deviceOrientation.alpha + this.alphaOffset; // Z
-			const beta  = this._deviceOrientation.beta  + this.betaOffset;  // X'
-			const gamma = this._deviceOrientation.gamma + this.gammaOffset; // Y''
+			const alpha = this._deviceOrientation.alpha + this.offsetAlpha; // Z
+			const beta  = this._deviceOrientation.beta  + this.offsetBeta;  // X'
+			const gamma = this._deviceOrientation.gamma + this.offsetGamma; // Y''
 			const orient = this._screenOrientation; // O
 			
 			// The angles alpha, beta and gamma form a set of intrinsic Tait-Bryan angles of type Z-X'-Y''
 			this._quaternion.setFromEuler( beta, alpha, - gamma, ROTATION_ORDER ); // orient the device
 			this._quaternion.multiply( q1 ); // camera looks out the back of the device, not the top
-			this._quaternion.multiply( q0.setFromAxisAngle( Z_AXIS[ 0 ], Z_AXIS[ 1 ], Z_AXIS[ 2 ], - orient ) ); // adjust for screen orientation
+			this._quaternion.multiply( q0.setFromAxisAngle( Z_AXIS, - orient ) ); // adjust for screen orientation
 
 			this.dispatchEvent( { type: 'updated' } );
 
@@ -108,9 +109,9 @@ export class DeviceOrientation extends EventDispatcher {
 
 	public calibrate() : void {
 
-		this.alphaOffset = - this.alpha;
-		this.betaOffset  = - this.beta;
-		this.gammaOffset = - this.gamma;
+		this.offsetAlpha = - this.alpha;
+		this.offsetBeta  = - this.beta;
+		this.offsetGamma = - this.gamma;
 		// this.screenOrientationOffset = - this.screenOrientation;
 
 	}
